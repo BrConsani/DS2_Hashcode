@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -10,7 +11,9 @@
 #define INICIO 0
 #define ATUAL 1
 #define FINAL 2
-#define SIZE 256
+#define TAM 256
+#define HASH 11
+#define BUCKET 2
 
 typedef struct reg{
 	int cod;
@@ -24,7 +27,10 @@ int tempRemove[4];
 int tempBusca[4];
 int tempIndex[3] = {0, 0, 0};
 
-void inserir();
+void inserir(Registro registro);
+int codificar(int codigo);
+void criarHash();
+void insereHash(int cod, int endereco, int offset);
 void remover();
 void buscar();
 void carregarArquivos();
@@ -43,6 +49,7 @@ int main(void){
 		mkdir("temp", 0777);
 
     obterCache();
+    criarHash();
     
     printf("///////////////  SISTEMA DE REGISTRO DE SEGURADORAS  ///////////////\n");
 	printf("///////////////                MENU                  ///////////////\n");
@@ -60,7 +67,7 @@ int main(void){
         scanf("%d", &escolha);
         switch(escolha){
             case 1:
-                inserir();
+                inserir(tempInsere[tempIndex[0]]);
                 tempIndex[0]++;
                 break;
             case 2:
@@ -98,22 +105,110 @@ int main(void){
     }while(escolha != -1);
 }
 
-void inserir(){
-    /*A cada inserção o Código deverá ser adicionado ao índice primário estruturado como uma hash.
-    Portanto, a cada nova inserção as seguintes mensagens deverão ser mostradas: 
-    1. “Endereço X”, endereço X gerado para a chave fornecida; 
-    2. “Chave X inserida com sucesso” deve ser impressa ao final da inserção indicando sucesso da operação; 
-    3. “Colisão”, sempre que um home address não estiver livre, gerando uma colisão; 
-    4. “Tentativa X”, X é o número da tentativa para tratar a colisão. 
+void criarHash(){
+    FILE *hash;
 
-    Observações:
-    1. Para tratar as colisões utilize Overflow Progressivo; 
-    2. Considere uma hash de 11 posições;
-    3. Utilize o Método da Divisão Inteira para encontrar o endereçamento de uma dada chave (função hash); 
-    4. Cada endereçamento contém duas chaves (está sendo utilizado o conceito de Bucket); 
-    5. Lembre-se que o arquivo hash é um arquivo de registros fixos que contém, no mínimo, duas informações: 
-    Chave + RRN. Campos adicionais podem ser acrescentados se necessário.
-    */
+    hash = fopen("./temp/hash.bin", "rb");
+
+    if(hash == NULL){
+        hash = fopen("./temp/hash.bin", "w+b");
+        
+        int i;
+        for(i=0; i < HASH*BUCKET; i++){
+            int aux = -1;
+            fwrite(&aux, sizeof(int), 1, hash);
+        }
+        fclose(hash);
+        printf("Hash criado!\n");
+    }
+}
+
+void inserir(Registro registro){
+
+	char buffer[sizeof(Registro)];
+    
+	sprintf(buffer, "%d#%s#%s#%s", registro.cod, registro.nome, registro.seg, registro.tipo);
+	int tamanhoRegistro = strlen(buffer);
+    
+	FILE *data;
+
+	data = fopen("./temp/data.bin", "r+b");
+
+	if (data == NULL)
+	{
+		printf("Arquivo data.bin criado!\n");
+		data = fopen("./temp/data.bin", "w+b");
+	}
+	else
+		fseek(data, 0, FINAL);
+
+	int posicaoData = ftell(data);
+
+	fwrite(&tamanhoRegistro, sizeof(int), 1, data);
+    fwrite(&buffer, sizeof(char), tamanhoRegistro, data);
+    fclose(data);
+
+    int endereco = codificar(registro.cod);
+    
+    insereHash(registro.cod ,endereco, posicaoData);
+}
+
+int codificar(int codigo){
+    return codigo % HASH;
+}
+
+void insereHash(int cod, int endereco, int offset){
+    //Fazer busca antes p/ verificar se ja existe um codigo igual
+    printf("Codigo %d", cod);
+    printf("Endereco %d\n", endereco);
+
+    FILE *hash;
+
+    hash = fopen("./temp/hash.bin", "wb");
+
+    fseek(hash, endereco * sizeof(int) * 4, INICIO);
+    //Verificar se o arquivo esta cheio, rodando ele inteiro
+
+    int pos1, pos2;
+    int contColisao = 0;
+
+    do{
+        fread(&pos1, sizeof(int), 1, hash);
+        fseek(hash, sizeof(int), ATUAL);
+        fread(&pos2, sizeof(int), 1, hash);
+        fseek(hash, -sizeof(int), ATUAL);
+        fseek(hash, -sizeof(int), ATUAL);
+        printf("%d", ftell(hash));
+
+        printf("%d", pos1);
+        printf("%d", pos2);
+
+        if(pos1 == -1 || pos1 == -2){
+            fwrite(&cod, sizeof(int), 1, hash);
+            fwrite(&offset, sizeof(int), 1, hash);
+            printf("Codigo %d inserido com sucesso!\n");
+            break;
+        }else if(pos2 == -1 || pos2 == -2){
+            fseek(hash, 2*sizeof(int), ATUAL);
+            fwrite(&cod, sizeof(int), 1, hash);
+            fwrite(&offset, sizeof(int), 1, hash);
+            printf("Codigo %d inserido com sucesso!\n");
+            break;
+        }else{
+            printf("Colisao\n");
+            contColisao++;
+            printf("Tentativa %d\n", contColisao);
+            fseek(hash, 4*sizeof(int), ATUAL);
+            if(endereco * sizeof(int) * 4 == ftell(hash)){
+                printf("Nao possui espaco no hash!");
+                break;
+            }
+
+            if(feof(hash))
+                fseek(hash, 0, INICIO);
+        }
+    } while(1);
+    fclose(hash);
 }
 
 void remover(){
@@ -222,6 +317,8 @@ void dumpArquivo(){
         printf(" 1. data.bin\n");
     if (fopen("./temp/cache.bin", "rb") != NULL)
         printf(" 2. cache.bin\n");
+    if (fopen("./temp/hash.bin", "rb") != NULL)
+        printf(" 3. hash.bin\n");
 
     printf("-1. RETORNAR\n\n");
 
@@ -239,6 +336,9 @@ void dumpArquivo(){
         case 2:
             myfile = fopen("./temp/cache.bin", "rb");
             break;
+        case 3:
+            myfile = fopen("./temp/hash.bin", "rb");
+            break;
         default:
             printf("Escolha invalida, abortando dump.\n");
             return;
@@ -246,13 +346,13 @@ void dumpArquivo(){
 
     printf("\n");
 
-    unsigned char buffer[SIZE];
+    unsigned char buffer[TAM];
     size_t n;
     size_t offset = 0;
 
-    while ((n = fread(buffer, 1, SIZE, myfile)) > 0){
+    while ((n = fread(buffer, 1, TAM, myfile)) > 0){
         hexDump(offset, buffer, n);
-        if (n < SIZE)
+        if (n < TAM)
             break;
         offset += n;
     }
