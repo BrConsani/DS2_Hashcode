@@ -34,7 +34,7 @@ int codificar(int codigo);
 void criarHash();
 void insereHash(int cod, int endereco, int offset);
 void remover(int codigo);
-void buscar();
+void buscar(int codigo);
 void carregarArquivos();
 void recuperarIndexes();
 void obterCache();
@@ -77,7 +77,7 @@ int main(void){
                 tempIndex[1]++;
                 break;
             case 3:
-                buscar();
+                buscar(tempBusca[tempIndex[2]]);
                 tempIndex[2]++;
                 break;
             case 4:
@@ -159,7 +159,6 @@ int codificar(int codigo){
 }
 
 void insereHash(int cod, int endereco, int offset){
-    //Fazer busca antes p/ verificar se ja existe um codigo igual
     printf("Codigo %d\n", cod);
     printf("Endereco %d\n", endereco);
 
@@ -235,35 +234,63 @@ void remover(int codigo){
     printf("Codigo %d removido com sucesso!\n", codigo);
 }
 
-void buscar(){
-    /*Dado um Código o programa retorna os dados do respectivo Segurado. 
-    Para tanto, a busca deve ser feita na hash. 
-    Além disso, as seguintes mensagens deverão ser exibidas em relação à busca: 
-    1. “Chave X encontrada, endereço E, N acessos” indica que a chave X foi encontrada no endereço E 
-    e que foram necessários N acessos para recuperar a informação na hash. 
-    Após a exibição dessa mensagem, os dados referentes ao Segurado deverão ser recuperados 
-    do arquivo principal; 
-    2. “Chave X não encontrada” indica que a Chave X não está presente na hash e, 
-    consequente, no arquivo principal. 
-    */
+void buscar(int codigo){
+    FILE *hash;
+    hash = fopen("./temp/hash.bin", "rb");
+    int endereco = codificar(codigo);
+    fseek(hash, endereco * sizeof(int) * 4, INICIO);
+    
+    int info;
+    int acessos = 0;
+    do{
+        fread(&info, sizeof(int), 1, hash);
+        fseek(hash, sizeof(int), ATUAL);
+        acessos++;
+    }while(info != codigo && info != NULO);
+    
+    if(info == NULO){
+        printf("Codigo %d nao encontrado!\n", codigo);
+        return;
+    }
+
+    int enderecoPrincipal;
+    fseek(hash, -sizeof(int), ATUAL);
+    fread(&enderecoPrincipal, sizeof(int), 1, hash);
+
+    fclose(hash);
+    
+    FILE *data;
+    data = fopen("./temp/data.bin", "rb");
+    fseek(data, enderecoPrincipal, INICIO);
+    
+    int tamanhoRegistro;
+    fread(&tamanhoRegistro, sizeof(int), 1, data);
+    
+    char registro[tamanhoRegistro];
+    fread(&registro, sizeof(char), tamanhoRegistro, data);
+
+    fclose(data);
+
+    printf("Codigo %d encontrado, endereco %d, %d acessos.\n", codigo, endereco, acessos);
+    printf("Dados: %s\n", registro);
 }
 
 void carregarArquivos(){
     FILE *insere;
 
-	insere = fopen("./temp-testes/insere.bin", "r+b");
+	insere = fopen("./temp-testes/insere.bin", "rb");
 	fread(&tempInsere, sizeof(struct reg), 6, insere);
 	fclose(insere);
 
     FILE *remove;
 
-	remove = fopen("./temp-testes/remove.bin", "r+b");
+	remove = fopen("./temp-testes/remove.bin", "rb");
 	fread(&tempRemove, sizeof(int), 4, remove);
 	fclose(remove);
 
     FILE *busca;
 
-	busca = fopen("./temp-testes/busca.bin", "r+b");
+	busca = fopen("./temp-testes/busca.bin", "rb");
 	fread(&tempBusca, sizeof(int), 4, busca);
 	fclose(busca);
 
