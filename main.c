@@ -108,19 +108,18 @@ int main(void){
 void criarHash(){
     FILE *hash;
 
-    hash = fopen("./temp/hash.bin", "rb");
+    hash = fopen("./temp/hash.bin", "r+b");
 
     if(hash == NULL){
-        hash = fopen("./temp/hash.bin", "w+b");
-        
+        hash = fopen("./temp/hash.bin", "wb");
         int i;
-        for(i=0; i < HASH*BUCKET; i++){
+        for(i=0; i < HASH*2*BUCKET; i++){
             int aux = -1;
             fwrite(&aux, sizeof(int), 1, hash);
         }
-        fclose(hash);
         printf("Hash criado!\n");
     }
+    fclose(hash);
 }
 
 void inserir(Registro registro){
@@ -137,7 +136,7 @@ void inserir(Registro registro){
 	if (data == NULL)
 	{
 		printf("Arquivo data.bin criado!\n");
-		data = fopen("./temp/data.bin", "w+b");
+		data = fopen("./temp/data.bin", "wb");
 	}
 	else
 		fseek(data, 0, FINAL);
@@ -159,40 +158,32 @@ int codificar(int codigo){
 
 void insereHash(int cod, int endereco, int offset){
     //Fazer busca antes p/ verificar se ja existe um codigo igual
-    printf("Codigo %d", cod);
+    printf("Codigo %d\n", cod);
     printf("Endereco %d\n", endereco);
 
     FILE *hash;
 
-    hash = fopen("./temp/hash.bin", "wb");
+    hash = fopen("./temp/hash.bin", "r+b");
 
     fseek(hash, endereco * sizeof(int) * 4, INICIO);
-    //Verificar se o arquivo esta cheio, rodando ele inteiro
 
-    int pos1, pos2;
+    int bucket[4];
     int contColisao = 0;
 
     do{
-        fread(&pos1, sizeof(int), 1, hash);
-        fseek(hash, sizeof(int), ATUAL);
-        fread(&pos2, sizeof(int), 1, hash);
-        fseek(hash, -sizeof(int), ATUAL);
-        fseek(hash, -sizeof(int), ATUAL);
-        printf("%d", ftell(hash));
+        fread(&bucket, sizeof(int), 4, hash);
+        fseek(hash, -4*sizeof(int), ATUAL);
 
-        printf("%d", pos1);
-        printf("%d", pos2);
-
-        if(pos1 == -1 || pos1 == -2){
+        if(bucket[0] == -1 || bucket[0] == -2){
             fwrite(&cod, sizeof(int), 1, hash);
             fwrite(&offset, sizeof(int), 1, hash);
-            printf("Codigo %d inserido com sucesso!\n");
+            printf("Codigo %d inserido com sucesso!\n", cod);
             break;
-        }else if(pos2 == -1 || pos2 == -2){
+        }else if(bucket[2] == -1 || bucket[2] == -2){
             fseek(hash, 2*sizeof(int), ATUAL);
             fwrite(&cod, sizeof(int), 1, hash);
             fwrite(&offset, sizeof(int), 1, hash);
-            printf("Codigo %d inserido com sucesso!\n");
+            printf("Codigo %d inserido com sucesso!\n", cod);
             break;
         }else{
             printf("Colisao\n");
@@ -203,7 +194,6 @@ void insereHash(int cod, int endereco, int offset){
                 printf("Nao possui espaco no hash!");
                 break;
             }
-
             if(feof(hash))
                 fseek(hash, 0, INICIO);
         }
