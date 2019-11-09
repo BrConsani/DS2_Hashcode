@@ -7,6 +7,8 @@
 
 #define TRUE 1
 #define FALSE 0
+#define NULO -1
+#define VAGO -2
 
 #define INICIO 0
 #define ATUAL 1
@@ -31,7 +33,7 @@ void inserir(Registro registro);
 int codificar(int codigo);
 void criarHash();
 void insereHash(int cod, int endereco, int offset);
-void remover();
+void remover(int codigo);
 void buscar();
 void carregarArquivos();
 void recuperarIndexes();
@@ -71,7 +73,7 @@ int main(void){
                 tempIndex[0]++;
                 break;
             case 2:
-                remover();
+                remover(tempRemove[tempIndex[1]]);
                 tempIndex[1]++;
                 break;
             case 3:
@@ -114,7 +116,7 @@ void criarHash(){
         hash = fopen("./temp/hash.bin", "wb");
         int i;
         for(i=0; i < HASH*2*BUCKET; i++){
-            int aux = -1;
+            int aux = NULO;
             fwrite(&aux, sizeof(int), 1, hash);
         }
         printf("Hash criado!\n");
@@ -174,12 +176,12 @@ void insereHash(int cod, int endereco, int offset){
         fread(&bucket, sizeof(int), 4, hash);
         fseek(hash, -4*sizeof(int), ATUAL);
 
-        if(bucket[0] == -1 || bucket[0] == -2){
+        if(bucket[0] == NULO || bucket[0] == VAGO){
             fwrite(&cod, sizeof(int), 1, hash);
             fwrite(&offset, sizeof(int), 1, hash);
             printf("Codigo %d inserido com sucesso!\n", cod);
             break;
-        }else if(bucket[2] == -1 || bucket[2] == -2){
+        }else if(bucket[2] == NULO || bucket[2] == VAGO){
             fseek(hash, 2*sizeof(int), ATUAL);
             fwrite(&cod, sizeof(int), 1, hash);
             fwrite(&offset, sizeof(int), 1, hash);
@@ -201,11 +203,36 @@ void insereHash(int cod, int endereco, int offset){
     fclose(hash);
 }
 
-void remover(){
-    /*Dado um Código o programa remove o respectivo código do índice hash. 
-    Não é necessário realizar a remoção no arquivo principal (o que contém os registros, somente no índice). 
-    Para tanto, utilize o processo de remoção associado ao Overflow Progressivo. 
-    */
+void remover(int codigo){
+
+    int endereco = codificar(codigo);
+
+    FILE *hash;
+
+    hash = fopen("./temp/hash.bin", "r+b");
+    fseek(hash, endereco * sizeof(int) * 4, INICIO);
+
+    int info;
+
+    do{
+        fread(&info, sizeof(int), 1, hash);
+        fseek(hash, sizeof(int), ATUAL);
+    }while(info != codigo && info != NULO);
+
+    if(info == NULO){
+        printf("O codigo %d nao existe!\n", codigo);
+        return;
+    }
+
+    fseek(hash, -2*sizeof(int), ATUAL);
+
+    int aux = VAGO;
+    fwrite(&aux, sizeof(int), 1, hash);
+    aux = NULO;
+    fwrite(&aux, sizeof(int), 1, hash);
+
+    fclose(hash);
+    printf("Codigo %d removido com sucesso!\n", codigo);
 }
 
 void buscar(){
