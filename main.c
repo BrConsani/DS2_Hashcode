@@ -30,6 +30,7 @@ int tempBusca[4];
 int tempIndex[3] = {0, 0, 0};
 
 void inserir(Registro registro);
+int codigoExiste(int codigo);
 int codificar(int codigo);
 void criarHash();
 void insereHash(int cod, int endereco, int offset);
@@ -126,6 +127,11 @@ void criarHash(){
 
 void inserir(Registro registro){
 
+    if(codigoExiste(registro.cod)){
+        printf("Codigo %d duplicado, impossivel inserir no Hash!\n", registro.cod);
+        return;
+    }
+
 	char buffer[sizeof(Registro)];
     
 	sprintf(buffer, "%d#%s#%s#%s", registro.cod, registro.nome, registro.seg, registro.tipo);
@@ -152,6 +158,26 @@ void inserir(Registro registro){
     int endereco = codificar(registro.cod);
     
     insereHash(registro.cod ,endereco, posicaoData);
+}
+
+int codigoExiste(int codigo){
+    FILE *hash;
+    hash = fopen("./temp/hash.bin", "rb");
+    int endereco = codificar(codigo);
+    fseek(hash, endereco * sizeof(int) * 4, INICIO);
+    
+    int info;
+    int acessos = 0;
+    do{
+        fread(&info, sizeof(int), 1, hash);
+        fseek(hash, sizeof(int), ATUAL);
+    }while(info != codigo && info != NULO);
+    
+    if(info == NULO){
+        return FALSE;
+    }else{
+        return TRUE;
+    }
 }
 
 int codificar(int codigo){
