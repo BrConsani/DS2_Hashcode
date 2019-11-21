@@ -8,7 +8,7 @@
 #define TRUE 1
 #define FALSE 0
 #define NULO -1
-#define VAGO -2
+#define VAGO 0xfefefefe
 
 #define INICIO 0
 #define ATUAL 1
