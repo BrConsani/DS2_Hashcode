@@ -265,13 +265,16 @@ void buscar(int codigo){
     hash = fopen("./temp/hash.bin", "rb");
     int endereco = codificar(codigo);
     fseek(hash, endereco * sizeof(int) * 4, INICIO);
-    
+
+    int enderecoFinal = endereco;    
     int info;
     int acessos = 0;
     do{
         fread(&info, sizeof(int), 1, hash);
         fseek(hash, sizeof(int), ATUAL);
         acessos++;
+        if(acessos % 2 != 0 && acessos != 1)
+            enderecoFinal++;
     }while(info != codigo && info != NULO);
     
     if(info == NULO){
@@ -297,7 +300,7 @@ void buscar(int codigo){
 
     fclose(data);
 
-    printf("Codigo %d encontrado, endereco %d, %d acessos.\n", codigo, endereco, acessos);
+    printf("Codigo %d encontrado, endereco %d, %d acessos.\n", codigo, enderecoFinal, acessos);
     printf("Dados: %s\n", registro);
 }
 
